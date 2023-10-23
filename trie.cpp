@@ -1,74 +1,62 @@
 #include <iostream>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
-/**
- * Nodes of the Trie
- */
-class TrieNode {
+class Node {
 public:
-    char key;
-    TrieNode* parent;
-    std::unordered_map<char, TrieNode*> children;
-    bool end;
+    char character;
+    std::unordered_map<char, Node> children;
+    bool isTerminal;
 
-    TrieNode(char key) : key(key), parent(nullptr), end(false) {}
+    Node(char character = 0, bool isTerminal = false) : character(character), isTerminal(isTerminal) {}
 };
 
-/**
- * Trie
- */
 class Trie {
 public:
-    Trie() {
-        root = new TrieNode('\0');
+    Node root;
+
+    Trie() : root(0, false) {}
+
+    void insert(const std::string& word) {
+        Node* curr = &root;
+        for (char c : word) {
+            if (curr->children.find(c) == curr->children.end()) {
+                curr->children[c] = Node(c);
+            }
+            curr = &curr->children[c];
+        }
+        curr->isTerminal = true;
     }
 
-    void insert(std::string word) {
-        TrieNode* node = root;
-
-        for (size_t index = 0; index < word.length(); ++index) {
-            char c = word[index];
-            if (node->children.find(c) == node->children.end()) {
-                node->children[c] = new TrieNode(c);
-                node->children[c]->parent = node;
+    bool contains(const std::string& word) {
+        const Node* curr = &root;
+        for (char c : word) {
+            if (curr->children.find(c) == curr->children.end()) {
+                return false;
             }
-            node = node->children[c];
-
-            if (index == word.length() - 1) {
-                node->end = true;
-            }
+            curr = &curr->children[c];
         }
+        return curr->isTerminal;
     }
 
-    std::vector<std::string> find(std::string prefix) {
-        TrieNode* node = root;
-        std::vector<std::string> output;
+    std::vector<std::string> getPrefixes(const std::string& word) {
+        std::string prefix = "";
+        std::vector<std::string> prefixes;
+        const Node* curr = &root;
 
-        for (size_t index = 0; index < prefix.length(); ++index) {
-            char c = prefix[index];
-            if (node->children.find(c) != node->children.end()) {
-                node = node->children[c];
-            } else {
-                return output;
+        for (char c : word) {
+            if (curr->children.find(c) == curr->children.end()) {
+                return prefixes;
+            }
+            curr = &curr->children[c];
+            prefix += c;
+            if (curr->isTerminal) {
+                prefixes.push_back(prefix);
             }
         }
-        findAllWords(node, output);
 
-        return output;
-    }
-
-private:
-    TrieNode* root;
-
-    void findAllWords(TrieNode* node, std::vector<std::string>& arr) {
-        if (node->end) {
-            arr.insert(arr.begin(), node->getWord());
-        }
-
-        for (const auto& child : node->children) {
-            findAllWords(child.second, arr);
-        }
+        return prefixes;
     }
 };
 
@@ -77,11 +65,15 @@ int main() {
     trie.insert("apple");
     trie.insert("app");
     trie.insert("banana");
-    trie.insert("bat");
+    
+    std::cout << "Contains 'apple': " << (trie.contains("apple") ? "true" : "false") << std::endl;
+    std::cout << "Contains 'app': " << (trie.contains("app") ? "true" : "false") << std::endl;
+    std::cout << "Contains 'apples': " << (trie.contains("apples") ? "true" : "false") << std::endl;
 
-    std::vector<std::string> result = trie.find("app");
-    for (const std::string& word : result) {
-        std::cout << word << std::endl;
+    std::cout << "Prefixes of 'appetite':" << std::endl;
+    std::vector<std::string> prefixes = trie.getPrefixes("appetite");
+    for (const std::string& prefix : prefixes) {
+        std::cout << prefix << std::endl;
     }
 
     return 0;

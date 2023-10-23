@@ -1,139 +1,135 @@
 #include <iostream>
 #include <fstream>
-#include <vector>
-#include <unordered_map>
-#include <algorithm>
 #include <string>
+#include <deque>
+#include <unordered_map>
+#include <vector>
+#include <ctime>
 
-class TrieNode {
+class Node {
 public:
-    char key;
-    TrieNode* parent;
-    std::unordered_map<char, TrieNode*> children;
-    bool end;
+    char character;
+    std::unordered_map<char, Node> children;
+    bool isTerminal;
 
-    TrieNode(char key) : key(key), parent(nullptr), end(false) {}
+    Node(char character = 0, bool isTerminal = false) : character(character), isTerminal(isTerminal) {}
 };
 
 class Trie {
 public:
-    Trie() {
-        root = new TrieNode('\0');
-    }
+    Node root;
+
+    Trie() : root(0, false) {}
 
     void insert(const std::string& word) {
-        TrieNode* node = root;
-
-        for (size_t index = 0; index < word.length(); ++index) {
-            char c = word[index];
-            if (node->children.find(c) == node->children.end()) {
-                node->children[c] = new TrieNode(c);
-                node->children[c]->parent = node;
+        Node* curr = &root;
+        for (char c : word) {
+            if (curr->children.find(c) == curr->children.end()) {
+                curr->children[c] = Node(c);
             }
-            node = node->children[c];
-
-            if (index == word.length() - 1) {
-                node->end = true;
-            }
+            curr = &curr->children[c];
         }
+        curr->isTerminal = true;
     }
 
-    std::vector<std::string> find(const std::string& prefix) {
-        TrieNode* node = root;
-        std::vector<std::string> output;
-
-        for (size_t index = 0; index < prefix.length(); ++index) {
-            char c = prefix[index];
-            if (node->children.find(c) != node->children.end()) {
-                node = node->children[c];
-            } else {
-                return output;
+    bool contains(const std::string& word) {
+        const Node* curr = &root;
+        for (char c : word) {
+            if (curr->children.find(c) == curr->children.end()) {
+                return false;
             }
+            curr = &curr->children[c];
         }
-        findAllWords(node, output);
-
-        return output;
+        return curr->isTerminal;
     }
 
-private:
-    TrieNode* root;
+    std::vector<std::string> getPrefixes(const std::string& word) {
+        std::string prefix = "";
+        std::vector<std::string> prefixes;
+        const Node* curr = &root;
 
-    void findAllWords(TrieNode* node, std::vector<std::string>& arr) {
-        if (node->end) {
-            arr.insert(arr.begin(), node->getWord());
+        for (char c : word) {
+            if (curr->children.find(c) == curr->children.end()) {
+                return prefixes;
+            }
+            curr = &curr->children[c];
+            prefix += c;
+            if (curr->isTerminal) {
+                prefixes.push_back(prefix);
+            }
         }
 
-        for (const auto& child : node->children) {
-            findAllWords(child.second, arr);
-        }
+        return prefixes;
     }
 };
 
-std::string LongestString(const std::vector<std::string>& arr) {
-    return *std::max_element(arr.begin(), arr.end(),
-        [](const std::string& x, const std::string& y) {
-            return x.length() < y.length();
-        });
-}
-
-bool wordChecker(const std::string& word, Trie& trie) {
-    for (size_t index = 1; index <= word.length(); ++index) {
-        const std::string subWord = word.substr(0, index);
-        const std::vector<std::string> foundWords = trie.find(subWord);
-        const size_t length = foundWords.size();
-
-        if (length <= 1 && index == 1) {
-            return false;
-        } else if (length <= 1) {
-            return wordChecker(word.substr(index - 1), trie);
-        }
-    }
-
-    return true;
-}
-
-std::vector<std::string> searchConcatWords(const std::string& file, int noOfResults) {
+class Solution {
+public:
     Trie trie;
-    std::vector<std::string> result;
+    std::deque<std::pair<std::string, std::string>> queue;
 
-    std::ifstream inputFile(file);
-    if (!inputFile.is_open()) {
-        std::cerr << "Error: Unable to open file " << file << std::endl;
-        return result;
-    }
-
-    std::vector<std::string> text;
-    std::string line;
-    while (std::getline(inputFile, line)) {
-        text.push_back(line);
-        trie.insert(line);
-    }
-
-    inputFile.close();
-
-    while (noOfResults > 0) {
-        const std::string longestString = LongestString(text);
-        text.erase(std::remove(text.begin(), text.end(), longestString), text.end());
-
-        if (wordChecker(longestString, trie)) {
-            result.push_back(longestString);
-            noOfResults--;
+    void buildTrie(const std::string& filePath = "") {
+        try {
+            std::ifstream file(filePath);
+            if (file.is_open()) {
+                std::string line;
+                while (std::getline(file, line)) {
+                    std::string word = line;
+                    std::vector<std::string> prefixes = trie.getPrefixes(word);
+                    for (const std::string& prefix : prefixes) {
+                        queue.push_back(std::make_pair(word, word.substr(prefix.length())));
+                    }
+                    trie.insert(word);
+                }
+                file.close();
+            } else {
+                std::cout << "There was some error with the file!" << std::endl;
+                exit(0);
+            }
+        } catch (...) {
+            std::cout << "There was some error with the file!" << std::endl;
+            exit(0);
         }
     }
 
-    return result;
-}
+    std::pair<std::string, std::string> findLongestCompoundWords() {
+        std::string longest_word = "";
+        int longest_length = 0;
+        std::string second_longest = "";
+
+        while (!queue.empty()) {
+            std::pair<std::string, std::string> word_suffix = queue.front();
+            queue.pop_front();
+            std::string word = word_suffix.first;
+            std::string suffix = word_suffix.second;
+
+            if (trie.contains(suffix) && word.length() > longest_length) {
+                second_longest = longest_word;
+                longest_word = word;
+                longest_length = word.length();
+            } else {
+                std::vector<std::string> prefixes = trie.getPrefixes(suffix);
+                for (const std::string& prefix : prefixes) {
+                    queue.push_back(std::make_pair(word, suffix.substr(prefix.length())));
+                }
+            }
+        }
+
+        return std::make_pair(longest_word, second_longest);
+    }
+};
 
 int main() {
-    std::vector<std::string> result1 = searchConcatWords("./Input_01.txt", 2);
-    if (result1.size() >= 2) {
-        std::cout << result1[0] << ' ' << result1[1] << ' ' << "ms" << std::endl;
-    }
+    Solution sol;
+    clock_t start = clock();
+    sol.buildTrie("Input_02.txt");
+    std::pair<std::string, std::string> result = sol.findLongestCompoundWords();
+    clock_t end = clock();
+    double elapsed_time = double(end - start) / CLOCKS_PER_SEC;
 
-    std::vector<std::string> result2 = searchConcatWords("./Input_02.txt", 2);
-    if (result2.size() >= 2) {
-        std::cout << result2[0] << ' ' << result2[1] << ' ' << "ms" << std::endl;
-    }
+    std::cout << "Longest Compound Word: " << result.first << std::endl;
+    std::cout << "Second Longest Compound Word: " << result.second << std::endl;
+    std::cout << "Time taken: " << elapsed_time << " seconds" << std::endl;
 
     return 0;
 }
